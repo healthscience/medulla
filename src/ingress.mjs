@@ -14,6 +14,12 @@ export const VERIFIED = 'VERIFIED'
 export const MEDULLA_READY = 'MEDULLA_READY'
 export const MEDULLA_ERROR = 'MEDULLA_ERROR'
 export const INGRESS_COMMITTED = 'INGRESS_COMMITTED'
+export const SAVE_PHOTO = 'SAVE_PHOTO'
+export const GET_PHOTO = 'GET_PHOTO'
+export const LIST_PHOTOS = 'LIST_PHOTOS'
+export const PHOTO_SAVED = 'PHOTO_SAVED'
+export const PHOTO_LIST = 'PHOTO_LIST'
+export const PHOTO_RETRIEVED = 'PHOTO_RETRIEVED'
 
 const NONCE_BYTES = 24
 

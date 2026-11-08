@@ -5,6 +5,7 @@
 // `node` for unit tests.
 import Corestore from 'corestore'
 import Hyperbee from 'hyperbee'
+import Hyperdrive from 'hyperdrive'
 import b4a from 'b4a'
 import sodium from 'sodium-native'
 import {
@@ -18,6 +19,12 @@ import {
   MEDULLA_READY,
   MEDULLA_ERROR,
   INGRESS_COMMITTED,
+  SAVE_PHOTO,
+  GET_PHOTO,
+  LIST_PHOTOS,
+  PHOTO_SAVED,
+  PHOTO_LIST,
+  PHOTO_RETRIEVED,
   buildDbKey,
   parsePacket,
   commitResponse,
@@ -40,7 +47,13 @@ export {
   VERIFIED,
   MEDULLA_READY,
   MEDULLA_ERROR,
-  INGRESS_COMMITTED
+  INGRESS_COMMITTED,
+  SAVE_PHOTO,
+  GET_PHOTO,
+  LIST_PHOTOS,
+  PHOTO_SAVED,
+  PHOTO_LIST,
+  PHOTO_RETRIEVED
 }
 
 const IDENTITY_KEY = 'identity'
@@ -58,6 +71,7 @@ export class Medulla {
     this.identity = null // { publicKey, secretKey } as Buffers
     this.coupleBee = null // account/device -> coupling record
     this.nonceBee = null // nonce -> expiresAt
+    this.photos = null // Hyperdrive holding captured frames (radia units)
     this.opts = opts
   }
 
@@ -76,6 +90,12 @@ export class Medulla {
       keyEncoding: 'utf-8',
       valueEncoding: 'json'
     })
+    // Hyperdrive image store. The captured frame bytes live here so a peer can
+    // move the ratio lines; the overlay-data contract is saved separately to
+    // the ledger and references this path by id. Pass the raw Corestore
+    // (not a namespace) — hyperdrive 11 expects a corestore-like object.
+    this.photos = new Hyperdrive(this.store)
+    await this.photos.ready()
     await this.bee.ready()
     await this.coupleBee.ready()
     await this.nonceBee.ready()
@@ -281,10 +301,12 @@ export class Medulla {
   async _devicePublicKey(deviceOrFrom) {
     // External devices (BLE/wearable) couple their own public key under their id.
     // Phone-owned devices (radia/cale) use the instrument keypair.
+    // Unknown devices return null so the ACL check denies them (no silent fallback
+    // to the instrument key — that would let any `from` write as the instrument).
     if (deviceOrFrom === this.publicKeyHex) return this.publicKeyHex
     const rec = await this.coupleBee.get(String(deviceOrFrom))
     if (rec && rec.value && rec.value.publicKey) return rec.value.publicKey
-    return this.publicKeyHex
+    return null
   }
 
   async _purgeExpiredNonces() {
@@ -300,7 +322,62 @@ export class Medulla {
     }
   }
 
+  // --- Photo capture (Hyperdrive image store) -------------------------------
+  // Save a captured frame's bytes to the Hyperdrive photo store. The overlay-data
+  // contract (radia units) is committed to the ledger separately and references
+  // this path by id, so a peer can move the ratio lines against the image.
+  _photoPath(id) {
+    return `photos/${id}.jpg`
+  }
+
+  async savePhoto(id, buffer, meta = {}) {
+    if (!this.photos) throw new Error('Medulla not ready — call ready() first')
+    const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer)
+    const path = this._photoPath(id)
+    await this.photos.put(path, buf)
+    return {
+      id,
+      path,
+      bytes: buf.length,
+      driveKey: this.photos.key ? b4a.toString(this.photos.key, 'hex') : null,
+      savedAt: Date.now(),
+      ...meta
+    }
+  }
+
+  async getPhoto(id) {
+    if (!this.photos) throw new Error('Medulla not ready — call ready() first')
+    const entry = await this.photos.get(this._photoPath(id))
+    if (!entry) return null
+    const rs = this.photos.createReadStream(this._photoPath(id))
+    let buf = Buffer.alloc(0)
+    for await (const chunk of rs) buf = Buffer.concat([buf, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)])
+    return { id, path: this._photoPath(id), entry, bytes: buf.length, buffer: buf }
+  }
+
+  async listPhotos(limit = 100) {
+    if (!this.photos) throw new Error('Medulla not ready — call ready() first')
+    const out = []
+    for await (const entry of this.photos.entries({ limit })) {
+      // hyperdrive entries() yields { seq, key, value }; the value is only
+      // populated for some entry types, so derive the name from the key and
+      // fetch the length via get() when available.
+      const key = entry.key
+      const rawName = typeof key === 'string' ? key : (key ? b4a.toString(key, 'utf-8') : null)
+      // hyperdrive normalizes keys with a leading slash; strip it for a clean name.
+      const name = rawName ? rawName.replace(/^\/+/, '') : null
+      let length = null
+      try {
+        const e = await this.photos.get(name)
+        if (e) length = e.length != null ? e.length : (e.size != null ? e.size : null)
+      } catch (_) { /* best-effort */ }
+      out.push({ seq: entry.seq, key, name, path: name, length, size: length })
+    }
+    return out
+  }
+
   async close() {
+    if (this.photos) await this.photos.close()
     if (this.store) await this.store.close()
   }
 }

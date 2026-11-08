@@ -11,8 +11,15 @@ import {
   VERIFIED,
   INGRESS_TELEMETRY,
   EGRESS_TELEMETRY,
+  SAVE_PHOTO,
+  GET_PHOTO,
+  LIST_PHOTOS,
+  PHOTO_SAVED,
+  PHOTO_LIST,
+  PHOTO_RETRIEVED,
   egressResponse
 } from './src/medulla-core.mjs'
+import b4a from 'b4a'
 
 const storageDir = Bare.argv[0] || Bare.homedir('.conduction-medulla')
 const medulla = new Medulla(storageDir)
@@ -53,6 +60,20 @@ try {
         // never leaves the worklet.
         const res = await medulla.signChallenge(payload.challenge)
         BareKit.IPC.write(JSON.stringify({ id, type: VERIFIED, ...res, status: 'OK' }))
+      } else if (action === SAVE_PHOTO) {
+        // Host sends a captured frame's bytes (base64 or array) plus meta.
+        const res = await medulla.savePhoto(packet.id, packet.buffer, payload)
+        BareKit.IPC.write(JSON.stringify({ id, type: PHOTO_SAVED, ...res }))
+      } else if (action === GET_PHOTO) {
+        const res = await medulla.getPhoto(payload.id)
+        if (!res) {
+          BareKit.IPC.write(JSON.stringify({ id, type: MEDULLA_ERROR, error: `Photo not found: ${payload.id}` }))
+          return
+        }
+        BareKit.IPC.write(JSON.stringify({ id, type: 'PHOTO_REtrieved', ...res, buffer: b4a.toString(res.buffer, 'base64') }))
+      } else if (action === LIST_PHOTOS) {
+        const res = await medulla.listPhotos(payload?.limit)
+        BareKit.IPC.write(JSON.stringify({ id, type: PHOTO_LIST, photos: res }))
       } else {
         BareKit.IPC.write(JSON.stringify({ id, type: MEDULLA_ERROR, error: `Unknown action: ${action}` }))
       }

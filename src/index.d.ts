@@ -9,6 +9,12 @@ export declare const VERIFIED: 'VERIFIED'
 export declare const MEDULLA_READY: 'MEDULLA_READY'
 export declare const MEDULLA_ERROR: 'MEDULLA_ERROR'
 export declare const INGRESS_COMMITTED: 'INGRESS_COMMITTED'
+export declare const SAVE_PHOTO: 'SAVE_PHOTO'
+export declare const GET_PHOTO: 'GET_PHOTO'
+export declare const LIST_PHOTOS: 'LIST_PHOTOS'
+export declare const PHOTO_SAVED: 'PHOTO_SAVED'
+export declare const PHOTO_LIST: 'PHOTO_LIST'
+export declare const PHOTO_RETRIEVED: 'PHOTO_RETRIEVED'
 
 export interface Identity {
   publicKey: Uint8Array
@@ -77,6 +83,32 @@ export interface Envelope {
   accountId?: string
 }
 
+export interface PhotoEntry {
+  seq?: number
+  key?: string | Uint8Array
+  name: string | null
+  path: string | null
+  length: number | null
+  size: number | null
+}
+
+export interface PhotoSaved {
+  id: string
+  path: string
+  bytes: number
+  driveKey: string | null
+  savedAt: number
+  [k: string]: unknown
+}
+
+export interface PhotoRetrieved {
+  id: string
+  path: string
+  entry: unknown
+  bytes: number
+  buffer: Uint8Array
+}
+
 export declare class Medulla {
   constructor(storageDir: string, opts?: Record<string, unknown>)
   storageDir: string
@@ -91,6 +123,9 @@ export declare class Medulla {
   listCouplings(): Promise<CouplingRecord[]>
   signChallenge(challenge: string): Promise<ChallengeResponse>
   static verifyChallenge(challenge: string, signatureHex: string, publicKeyHex: string): boolean
+  savePhoto(id: string, buffer: Uint8Array | string, meta?: Record<string, unknown>): Promise<PhotoSaved>
+  getPhoto(id: string): Promise<PhotoRetrieved | null>
+  listPhotos(limit?: number): Promise<PhotoEntry[]>
   close(): Promise<void>
 }
 
