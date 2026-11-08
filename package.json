@@ -1,0 +1,64 @@
+{
+  "name": "@conduction/medulla",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Host-agnostic conduction core: identity, coupling/verification, authenticated ingress, and append-only hyperbee ledger",
+  "main": "src/index.mjs",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.mjs"
+    },
+    "./core": {
+      "default": "./src/medulla-core.mjs"
+    },
+    "./ingress": {
+      "default": "./src/ingress.mjs"
+    },
+    "./worklet": {
+      "default": "./medulla.mjs"
+    },
+    "./bundle": {
+      "default": "./medulla.bundle"
+    },
+    "./example-host-shell": {
+      "default": "./examples/host-shell/App.js"
+    }
+  },
+  "files": [
+    "src",
+    "medulla.mjs",
+    "medulla.bundle",
+    "examples",
+    "scripts",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "prepack": "node scripts/prepack.mjs",
+    "prepare": "node scripts/prepare.mjs"
+  },
+  "dependencies": {
+    "corestore": "^6.0.0",
+    "hyperbee": "^2.0.0",
+    "b4a": "^1.6.0",
+    "sodium-native": "^5.0.0",
+    "hyperswarm": "^4.3.5",
+    "@hyperswarm/secret-stream": "^6.0.0",
+    "bare": "^1.36.0",
+    "bare-buffer": "*",
+    "bare-events": "*",
+    "bare-queue-microtask": "*",
+    "bare-runtime": "*",
+    "bare-stream": "*",
+    "bare-structured-clone": "*",
+    "bare-timers": "*",
+    "bare-url": "*"
+  },
+  "devDependencies": {
+    "bare-pack": "^1.5.0",
+    "vitest": "^2.0.0"
+  }
+}
